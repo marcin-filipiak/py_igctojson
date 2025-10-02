@@ -1,7 +1,6 @@
 import json
 
 def parse_igc_line(line):
-    # linie zaczynające się od B zawierają dane GPS
     if not line.startswith('B'):
         return None
     
@@ -11,7 +10,7 @@ def parse_igc_line(line):
     ss = int(line[5:7])
     time_str = f"{hh:02d}:{mm:02d}:{ss:02d}"
     
-    # szerokość
+    # szerokość (DDMMmmmN/S)
     lat_deg = int(line[7:9])
     lat_min = float(line[9:14]) / 1000
     lat_hem = line[14]
@@ -19,7 +18,7 @@ def parse_igc_line(line):
     if lat_hem == 'S':
         latitude = -latitude
     
-    # długość
+    # długość (DDDMMmmmE/W)
     lon_deg = int(line[15:18])
     lon_min = float(line[18:23]) / 1000
     lon_hem = line[23]
@@ -27,8 +26,11 @@ def parse_igc_line(line):
     if lon_hem == 'W':
         longitude = -longitude
     
-    # wysokość GPS (ostatnie 5 znaków)
-    altitude = int(line[25:30])  # GPS altitude
+    # wysokość GPS (ostatnie 5 znaków z E/W pola)
+    try:
+        altitude = int(line[25:30])
+    except ValueError:
+        altitude = None
     
     return {
         "time": time_str,
@@ -37,18 +39,29 @@ def parse_igc_line(line):
         "altitude": altitude
     }
 
-# wczytaj plik IGC
-positions = []
-with open('2024-08-16-XLK-Mar-02.IGC', 'r') as f:
-    for line in f:
-        line = line.strip()
-        data = parse_igc_line(line)
-        if data:
-            positions.append(data)
+def parse_igc_file(input_file):
+    positions = []
+    with open(input_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            data = parse_igc_line(line)
+            if data:
+                positions.append(data)
+    return positions
 
-# zapisz do JSON
-with open('flight.json', 'w') as f:
-    json.dump(positions, f, indent=2)
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 3:
+        print("Usage: python parse_igc.py input.IGC output.json")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
 
-print(f"Zapisano {len(positions)} pozycji do flight.json")
+    positions = parse_igc_file(input_file)
+
+    with open(output_file, 'w') as f:
+        json.dump(positions, f, indent=2)
+    
+    print(f"Zapisano {len(positions)} pozycji do {output_file}")
 
